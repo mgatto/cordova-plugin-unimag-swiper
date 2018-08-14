@@ -414,28 +414,44 @@ UmReader readerType;
     NSString* num;
     NSArray* name;
     NSString* exp;
+    NSString* birthdate;
 
     NSError *error = NULL;
+
     NSRegularExpression* cardParser = [NSRegularExpression regularExpressionWithPattern:
         @"%B(\\d+)\\^([^\\^]+)\\^(\\d{4})"
         options:0
         error:&error];
 
-    NSArray* matches = [cardParser 
-        matchesInString:data 
-        options:0 
+    /* please use https://regex101.com to decipher this monstrous regex. Conforms to ISO/IEC_7813. */
+    // NSLog(@"Raw swipe data: '%@'", data);
+    NSRegularExpression* licenseParser = [NSRegularExpression regularExpressionWithPattern:
+        @"(?:\\%)([A-Z]{2})([^\\^]{0,13})\\^?([^\\^]{0,35})\\^?([^\\^]{0,29})\\^?\\s*?\\?(?:;)(\\d{6})(\\d{0,13})(?:\\=)(\\d{4})(\\d{8})(\\d{0,5})\\=?\\?(?:\\#|\\%|\\+)(?:\\d|\\!|\")(?:.?|\\s)([0-9A-Z ]{11})"
+        options:0
+        error:&error];
+
+    NSArray* licensematches = [licenseParser
+        matchesInString:data
+        options:0
         range:NSMakeRange(0, [data length])];
 
-    if ([matches count]) {
-        num = [data substringWithRange:[[matches objectAtIndex:0] rangeAtIndex:1]];
+    NSArray* creditcardmatches = [cardParser
+        matchesInString:data
+        options:0
+        range:NSMakeRange(0, [data length])];
 
-        name = [[data substringWithRange:[[matches objectAtIndex:0] rangeAtIndex:2]] 
+    if ([creditcardmatches count]) {
+        num = [data substringWithRange:[[creditcardmatches objectAtIndex:0] rangeAtIndex:1]];
+
+        name = [[data substringWithRange:[[creditcardmatches objectAtIndex:0] rangeAtIndex:2]]
             componentsSeparatedByString:@"/"];
 
-        exp = [data substringWithRange:[[matches objectAtIndex:0] rangeAtIndex:3]];
+        exp = [data substringWithRange:[[creditcardmatches objectAtIndex:0] rangeAtIndex:3]];
 
         if (num && [name count] >= 2 && name[0] && name[1] && exp) {
             NSDictionary* cardData = [[NSDictionary alloc] initWithObjectsAndKeys:
+                @"creditcard", @"card_type",
+
                 num, @"card_number",
 
                 [exp substringFromIndex:2], @"expiry_month",
@@ -444,29 +460,80 @@ UmReader readerType;
 
                 [[name objectAtIndex:1] stringByTrimmingCharactersInSet:
                     [NSCharacterSet whitespaceCharacterSet]], @"first_name",
-                
+
                 [[name objectAtIndex:0] stringByTrimmingCharactersInSet:
                    [NSCharacterSet whitespaceCharacterSet]], @"last_name",
 
-                [[data componentsSeparatedByCharactersInSet:
+                /*[[data componentsSeparatedByCharactersInSet:
                         [NSCharacterSet whitespaceAndNewlineCharacterSet]]
                     componentsJoinedByString:@""], @"trimmedUnimagData",
-                
+                */
                 nil];
 
             return [[NSString alloc] initWithData:
-                        [NSJSONSerialization dataWithJSONObject:cardData 
-                            options:0 
+                        [NSJSONSerialization dataWithJSONObject:cardData
+                            options:0
                             error:&error]
                 encoding:NSUTF8StringEncoding];
         }
+    } else if ([licensematches count]) {
+        birthdate = [data substringWithRange:[[licensematches objectAtIndex:0] rangeAtIndex:8]];
+
+        name = [[data substringWithRange:[[licensematches objectAtIndex:0] rangeAtIndex:3]]
+                componentsSeparatedByString:@"$"];
+
+        if ([name count] >= 2 && name[0] && name[1]) {
+            NSDictionary* cardData = [[NSDictionary alloc] initWithObjectsAndKeys:
+                @"driverslicense", @"card_type",
+
+                [data substringWithRange:[[licensematches objectAtIndex:0] rangeAtIndex:1]], @"state",
+                [data substringWithRange:[[licensematches objectAtIndex:0] rangeAtIndex:2]], @"city",
+                [data substringWithRange:[[licensematches objectAtIndex:0] rangeAtIndex:4]], @"address",
+                [data substringWithRange:[[licensematches objectAtIndex:0] rangeAtIndex:10]], @"zip",
+
+                [birthdate substringWithRange:NSMakeRange(4, 2)], @"birth_month",
+
+                [birthdate substringFromIndex:6], @"birth_day",
+
+                [birthdate substringToIndex:4], @"birth_year",
+
+                [[name objectAtIndex:1] stringByTrimmingCharactersInSet:
+                    [NSCharacterSet whitespaceCharacterSet]], @"first_name",
+
+                [[name objectAtIndex:0] stringByTrimmingCharactersInSet:
+                    [NSCharacterSet whitespaceCharacterSet]], @"last_name",
+
+                [[name objectAtIndex:2] stringByTrimmingCharactersInSet:
+                    [NSCharacterSet whitespaceCharacterSet]], @"middle_initial",
+
+                /*[[data componentsSeparatedByCharactersInSet:
+                    [NSCharacterSet whitespaceAndNewlineCharacterSet]]
+                        componentsJoinedByString:@""], @"trimmedUnimagData",
+                 */
+                nil];
+
+            return [[NSString alloc] initWithData:
+                    [NSJSONSerialization dataWithJSONObject:cardData
+                            options:0
+                            error:&error]
+                        encoding:NSUTF8StringEncoding];
+        } else {
+            // How to return an error??
+            /* return [[NSString alloc] initWithData:
+                        [NSJSONSerialization dataWithJSONObject:cardData
+                            options:0
+                            error:&error]
+                encoding:NSUTF8StringEncoding];
+             */
+        }
     }
+
     return nil;
 }
 
-/** 
+/**
 * Retrieve error message corresponding to a particular UmRet value.
-* 
+*
 * @param  {UmRet}      ret
 *         Status of an SDK task
 * @return {NSString*}
