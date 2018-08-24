@@ -9,7 +9,7 @@
 
     <description>Cordova plugin for IDTech Unimag II, Unimag Pro, and Shuttle mobile credit card swipers.</description>
 
-    <repo>https://github.com/elizabethrego/cordova-plugin-unimag-swiper.git</repo>
+    <repo>https://github.com/mgatto/cordova-plugin-unimag-swiper.git</repo>
 
     <keyword>wodify, idtech, unimag, swiper, card reader, credit card</keyword>
 
@@ -21,7 +21,7 @@
     <engines>
 	  <engine name="cordova" version=">=3.5.0"/>
     </engines>
-    
+
     <!-- dependencies -->
     <dependency id="cordova-plugin-device" />
 
@@ -74,4 +74,3 @@
 	</platform>
 
 </plugin>
-
